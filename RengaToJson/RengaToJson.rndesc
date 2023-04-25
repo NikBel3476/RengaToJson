@@ -2,8 +2,8 @@
 	<Name>Renga to JSON</Name>
 	<Version>1.0</Version>
 	<RequiredAPIVersion>2.25</RequiredAPIVersion>
-	<Vendor>Renga Software LLC</Vendor>
-	<Copyright>Copyright Renga Software LLC, 2018. All rights reserved.</Copyright>
+	<Vendor></Vendor>
+	<Copyright></Copyright>
 	<PluginFilename>RengaToJson.dll</PluginFilename>
 	<PluginType>Net</PluginType>
 </RengaPlugin>
