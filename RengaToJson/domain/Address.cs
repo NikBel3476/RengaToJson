@@ -11,13 +11,11 @@ public class Address
 		AdditionalInfo = additionalInfo;
 	}
 
-	private string City { get; set; }
-
+	public string City { get; set; }
 	// [JsonPropertyName("StreetAddress")]
 	[JsonProperty("StreetAddress")]
-	private string Street { get; set; }
-
+	public string Street { get; set; }
 	// [JsonPropertyName("AddInfo")]
 	[JsonProperty("AddInfo")]
-	private string AdditionalInfo { get; set; }
+	public string AdditionalInfo { get; set; }
 }

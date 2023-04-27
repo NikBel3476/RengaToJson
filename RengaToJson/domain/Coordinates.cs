@@ -12,5 +12,5 @@ public class Coordinates
 
 	// [JsonPropertyName("points")]
 	[JsonProperty("points")]
-	private List<Point> Points { get; set; }
+	public List<Point> Points { get; set; }
 }

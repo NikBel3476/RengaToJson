@@ -54,6 +54,9 @@
         <Compile Include="domain\Coordinates.cs" />
         <Compile Include="domain\Level.cs" />
         <Compile Include="domain\Point.cs" />
+        <Compile Include="domain\Renga\ModelParameters.cs" />
+        <Compile Include="domain\Renga\ModelProperties.cs" />
+        <Compile Include="domain\Renga\ModelWithCoordinates.cs" />
         <Compile Include="RengaToJsonPlugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>

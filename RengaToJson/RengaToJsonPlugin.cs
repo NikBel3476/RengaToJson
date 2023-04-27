@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
-using Newtonsoft.Json;
 using Renga;
 using Renga.GridTypes;
 using RengaToJson.domain;
+using RengaToJson.domain.Renga;
 
 namespace RengaToJson;
 
@@ -22,6 +23,7 @@ public class RengaToJsonPlugin : IPlugin
 		var panelExtension = ui.CreateUIPanelExtension();
 		var action = ui.CreateAction();
 		action.ToolTip = PluginName;
+
 		events = new ActionEventSource(action);
 		events.Triggered += (s, e) =>
 		{
@@ -39,7 +41,7 @@ public class RengaToJsonPlugin : IPlugin
 				catch (Exception exception)
 				{
 					ui.ShowMessageBox(MessageIcon.MessageIcon_Info,
-						"Model object list",
+						PluginName,
 						exception.Message
 					);
 				}
@@ -70,42 +72,74 @@ public class RengaToJsonPlugin : IPlugin
 
 		var modelObjectCollection = app.Project.Model.GetObjects();
 
-		var modelObjectCount = modelObjectCollection.Count;
-
 		result.AppendLine($"objects3DCount: {objects3D.Count}");
 
-		for (var i = 0; i < objects3D.Count; i++)
+		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
+		foreach (var model in modelsWithCoordinates)
 		{
-			var object3D = objects3D.Get(i);
-			var modelObject = modelObjectCollection.GetById(object3D.ModelObjectId);
-			var objectType = modelObject.ObjectType;
+			result.AppendLine($"{model.Name} {model.Uuid}");
+			foreach (var coordinates in model.Coordinates)
+				result.AppendLine($"X: {coordinates.X} Y: {coordinates.Y} Z: {coordinates.Z}");
+		}
 
-			if (objectType == ObjectTypes.Room)
+
+		// for (var i = 0; i < objects3D.Count; i++)
+		// {
+		// 	var object3D = objects3D.Get(i);
+		// 	var modelObject = modelObjectCollection.GetById(object3D.ModelObjectId);
+		// 	var objectType = modelObject.ObjectType;
+		//
+		// 	var meshes = new List<IMesh>();
+		// 	var grids = new List<IGrid>();
+		// 	var vertexes = new List<FloatPoint3D>();
+		// 	for (var meshIndex = 0; meshIndex < object3D.MeshCount; meshIndex++)
+		// 	{
+		// 		var mesh = object3D.GetMesh(meshIndex);
+		// 		meshes.Add(mesh);
+		// 		for (var gridIndex = 0; gridIndex < mesh.GridCount; gridIndex++)
+		// 		{
+		// 			var grid = mesh.GetGrid(gridIndex);
+		// 			if (objectType == ObjectTypes.Room)
+		// 			{
+		// 				if (grid.GridType == (int)Room.Floor)
+		// 				{
+		// 					grids.Add(grid);
+		// 					for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
+		// 					{
+		// 						var vertex = grid.GetVertex(vertexIndex);
+		// 						vertexes.Add(vertex);
+		// 						result.AppendLine($"Name: ${modelObject.Name}");
+		// 						result.AppendLine($"Coordinates: X: {vertex.X} Y: {vertex.Y} Z: {vertex.Z}");
+		// 					}
+		// 				}
+		// 			}
+		// 			else if (objectType == ObjectTypes.Door)
+		// 			{
+		// 				if (grid.GridType == (int)Door.Reveal)
+		// 					for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
+		// 					{
+		// 						var vertex = grid.GetVertex(vertexIndex);
+		// 						result.AppendLine($"Name: ${modelObject.Name}");
+		// 						result.AppendLine($"Coordinates: X: {vertex.X} Y: {vertex.Y} Z: {vertex.Z}");
+		// 					}
+		// 			}
+		// 		}
+		// 	}
+
+		/*else if (objectType == ObjectTypes.Door)
+		{
+			var properties = modelObject.GetProperties();
+			if (properties != null)
 			{
-				var meshes = new List<IMesh>();
-				var grids = new List<IGrid>();
-				var vertexes = new List<FloatPoint3D>();
-				for (var meshIndex = 0; meshIndex < object3D.MeshCount; meshIndex++)
+				var ids = properties.GetIds();
+				for (var propertyIndex = 0; propertyIndex < ids.Count; propertyIndex++)
 				{
-					var mesh = object3D.GetMesh(meshIndex);
-					meshes.Add(mesh);
-					for (var gridIndex = 0; gridIndex < mesh.GridCount; gridIndex++)
-					{
-						var grid = mesh.GetGrid(gridIndex);
-						if (grid.GridType == (int)Room.Floor)
-						{
-							grids.Add(grid);
-							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
-							{
-								var vertex = grid.GetVertex(vertexIndex);
-								vertexes.Add(vertex);
-								result.AppendLine($"Coordinates: X: {vertex.X} Y: {vertex.Y} Z: {vertex.Z}");
-							}
-						}
-					}
+					var property = properties.Get(ids.Get(propertyIndex));
+					result.AppendLine($"{property.Name} {}")
 				}
 			}
-		}
+		}*/
+		// }
 
 		var buildingInfo = app.Project.BuildingInfo;
 		var addressInfo = buildingInfo.GetAddress();
@@ -114,6 +148,69 @@ public class RengaToJsonPlugin : IPlugin
 		var devs = new List<int>();
 		var building = new Building(buildingInfo.Name, address, devs);
 
-		return JsonConvert.SerializeObject(building, Formatting.Indented);
+		return result.ToString();
+		// return JsonConvert.SerializeObject(building, Formatting.Indented);
+	}
+
+	// private string ModelProperties()
+	// {
+	// }
+
+	// private object GetPropertyValue(IProperty property)
+	// {
+	// 	switch (property.Type)
+	// 	{
+	// 		case PropertyType
+	// 	}
+	// }
+
+	private List<ModelWithCoordinates> GetModelsWithCoordinates(IExportedObject3DCollection objects3D,
+		IModelObjectCollection modelObjectCollection)
+	{
+		var modelsWithCoordinates = new List<ModelWithCoordinates>();
+		for (var i = 0; i < objects3D.Count; i++)
+		{
+			var object3D = objects3D.Get(i);
+			var modelObject = modelObjectCollection.GetById(object3D.ModelObjectId);
+			var objectType = modelObject.ObjectType;
+
+			for (var meshIndex = 0; meshIndex < object3D.MeshCount; meshIndex++)
+			{
+				var mesh = object3D.GetMesh(meshIndex);
+				for (var gridIndex = 0; gridIndex < mesh.GridCount; gridIndex++)
+				{
+					var grid = mesh.GetGrid(gridIndex);
+					if (objectType == ObjectTypes.Room)
+					{
+						var vertexes = new List<FloatPoint3D>();
+						if (grid.GridType == (int)Room.Floor)
+						{
+							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
+								vertexes.Add(grid.GetVertex(vertexIndex));
+
+							modelsWithCoordinates.Add(
+								new ModelWithCoordinates(modelObject.uniqueId, modelObject.Name, vertexes)
+							);
+						}
+					}
+					else if (objectType == ObjectTypes.Door)
+					{
+						if (grid.GridType == (int)Door.Reveal)
+						{
+							var vertexes = new List<FloatPoint3D>();
+							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
+								vertexes.Add(grid.GetVertex(vertexIndex));
+
+							if (vertexes.All(x => x.Z == vertexes.First().Z))
+								modelsWithCoordinates.Add(
+									new ModelWithCoordinates(modelObject.uniqueId, modelObject.Name, vertexes)
+								);
+						}
+					}
+				}
+			}
+		}
+
+		return modelsWithCoordinates;
 	}
 }

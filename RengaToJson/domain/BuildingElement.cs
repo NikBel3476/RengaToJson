@@ -25,14 +25,12 @@ public class BuildingElement
 
 	// [JsonPropertyName("@")]
 	[JsonProperty("@")]
-	private Guid Uuid { get; set; }
-
-	private Guid Id { get; set; }
-	private string Name { get; set; }
-	private double SizeZ { get; set; }
-	private string Sign { get; set; }
-
+	public Guid Uuid { get; set; }
+	public Guid Id { get; set; }
+	public string Name { get; set; }
+	public double SizeZ { get; set; }
+	public string Sign { get; set; }
 	// [JsonPropertyName("XY")]
 	[JsonProperty("XY")]
-	private List<Coordinates> Coordinates { get; set; }
+	public List<Coordinates> Coordinates { get; set; }
 }

@@ -14,13 +14,10 @@ public class Building
 	}
 
 	public List<int> Devs { get; set; }
-
 	// [JsonPropertyName("NameBuilding")]
 	[JsonProperty("NameBuilding")]
 	public string BuildingName { get; set; }
-
 	public Address Address { get; set; }
-
 	// [JsonPropertyName("Level")]
 	// private List<Level> Levels { get; set; }
 }
