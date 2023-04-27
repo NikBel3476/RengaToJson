@@ -30,7 +30,8 @@ public class RengaToJsonPlugin : IPlugin
 			var filePath = ui.ShowSaveFileDialog(
 				"Save json from renga file",
 				"",
-				"Json files (*.json)|*.json");
+				"Json files (*.json)|*.json"
+			);
 
 			if (filePath != "")
 				try
@@ -75,14 +76,38 @@ public class RengaToJsonPlugin : IPlugin
 		result.AppendLine($"objects3DCount: {objects3D.Count}");
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
-		foreach (var model in modelsWithCoordinates)
+		var rooms = modelsWithCoordinates.Where(x => x.Sign == "Room").ToList();
+		var doors = modelsWithCoordinates.Where(x => x.Sign == "DoorWayInt").ToList();
+		foreach (var room in rooms)
+			for (var i = 0; i < room.Coordinates.Count - 1; i++)
+			{
+				var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
+				foreach (var door in doors)
+				foreach (var doorPoint in door.Coordinates)
+					if (
+						IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+						!door.Outputs.Contains(room.Uuid) &&
+						!room.Outputs.Contains(door.Uuid)
+					)
+					{
+						room.Outputs.Add(door.Uuid);
+						door.Outputs.Add(room.Uuid);
+					}
+			}
+
+		var modelsWithOutputs = rooms.Concat(doors);
+
+		foreach (var model in modelsWithOutputs)
 		{
 			result.AppendLine($"{model.Name} {model.Uuid}");
-			foreach (var coordinates in model.Coordinates)
-				result.AppendLine($"X: {coordinates.X} Y: {coordinates.Y} Z: {coordinates.Z}");
+			foreach (var outputUuid in model.Outputs)
+				result.AppendLine($"{outputUuid}");
+			result.AppendLine();
 		}
 
-
+		// result.AppendLine($"{model.Name} {model.Uuid}");
+		// foreach (var coordinates in model.Coordinates)
+		// result.AppendLine($"X: {coordinates.X} Y: {coordinates.Y} Z: {coordinates.Z}");
 		// for (var i = 0; i < objects3D.Count; i++)
 		// {
 		// 	var object3D = objects3D.Get(i);
@@ -164,7 +189,8 @@ public class RengaToJsonPlugin : IPlugin
 	// 	}
 	// }
 
-	private List<ModelWithCoordinates> GetModelsWithCoordinates(IExportedObject3DCollection objects3D,
+	private List<ModelWithCoordinates> GetModelsWithCoordinates(
+		IExportedObject3DCollection objects3D,
 		IModelObjectCollection modelObjectCollection)
 	{
 		var modelsWithCoordinates = new List<ModelWithCoordinates>();
@@ -188,8 +214,15 @@ public class RengaToJsonPlugin : IPlugin
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
 								vertexes.Add(grid.GetVertex(vertexIndex));
 
+							vertexes.Add(vertexes.First());
 							modelsWithCoordinates.Add(
-								new ModelWithCoordinates(modelObject.uniqueId, modelObject.Name, vertexes)
+								new ModelWithCoordinates(
+									modelObject.uniqueId,
+									modelObject.Name,
+									vertexes,
+									"Room",
+									new List<Guid>()
+								)
 							);
 						}
 					}
@@ -201,9 +234,17 @@ public class RengaToJsonPlugin : IPlugin
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
 								vertexes.Add(grid.GetVertex(vertexIndex));
 
+							vertexes.Add(vertexes.First());
 							if (vertexes.All(x => x.Z == vertexes.First().Z))
+								// TODO: check on outside door
 								modelsWithCoordinates.Add(
-									new ModelWithCoordinates(modelObject.uniqueId, modelObject.Name, vertexes)
+									new ModelWithCoordinates(
+										modelObject.uniqueId,
+										modelObject.Name,
+										vertexes,
+										"DoorWayInt",
+										new List<Guid>()
+									)
 								);
 						}
 					}
@@ -212,5 +253,23 @@ public class RengaToJsonPlugin : IPlugin
 		}
 
 		return modelsWithCoordinates;
+	}
+
+	private bool IsPointOnTheLineSegment(FloatPoint3D point, LineSegment lineSegment)
+	{
+		var a = lineSegment.P1;
+		var b = point;
+		var c = lineSegment.P2;
+		return IsPointOnTheLine(point, lineSegment) &&
+		       Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
+		       Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+	}
+
+	private bool IsPointOnTheLine(FloatPoint3D point, LineSegment lineSegment)
+	{
+		var a = lineSegment.P1;
+		var b = point;
+		var c = lineSegment.P2;
+		return a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y) == 0;
 	}
 }
