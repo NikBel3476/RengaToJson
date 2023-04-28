@@ -48,12 +48,13 @@
         <Reference Include="System.Xml" />
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="domain\Address.cs" />
-        <Compile Include="domain\Building.cs" />
-        <Compile Include="domain\BuildingElement.cs" />
-        <Compile Include="domain\Coordinates.cs" />
-        <Compile Include="domain\Level.cs" />
-        <Compile Include="domain\Point.cs" />
+        <Compile Include="domain\json\Address.cs" />
+        <Compile Include="domain\json\Building.cs" />
+        <Compile Include="domain\json\BuildingElement.cs" />
+        <Compile Include="domain\json\Coordinates.cs" />
+        <Compile Include="domain\json\Level.cs" />
+        <Compile Include="domain\json\Point.cs" />
+        <Compile Include="domain\Renga\LevelElevation.cs" />
         <Compile Include="domain\Renga\LineSegment.cs" />
         <Compile Include="domain\Renga\ModelParameters.cs" />
         <Compile Include="domain\Renga\ModelProperties.cs" />

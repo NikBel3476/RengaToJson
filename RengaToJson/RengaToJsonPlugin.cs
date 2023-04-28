@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
 using Renga;
 using Renga.GridTypes;
 using RengaToJson.domain;
@@ -78,33 +79,112 @@ public class RengaToJsonPlugin : IPlugin
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
 		var rooms = modelsWithCoordinates.Where(x => x.Sign == "Room").ToList();
 		var doors = modelsWithCoordinates.Where(x => x.Sign == "DoorWayInt").ToList();
-		foreach (var room in rooms)
-			for (var i = 0; i < room.Coordinates.Count - 1; i++)
-			{
-				var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
-				foreach (var door in doors)
-				foreach (var doorPoint in door.Coordinates)
-					if (
-						IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-						!door.Outputs.Contains(room.Uuid) &&
-						!room.Outputs.Contains(door.Uuid)
-					)
-					{
-						room.Outputs.Add(door.Uuid);
-						door.Outputs.Add(room.Uuid);
-					}
-			}
 
-		var modelsWithOutputs = rooms.Concat(doors);
+		// add relationships
+		// foreach (var room in rooms)
+		// 	for (var i = 0; i < room.Coordinates.Count - 1; i++)
+		// 	{
+		// 		var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
+		// 		foreach (var door in doors)
+		// 		foreach (var doorPoint in door.Coordinates)
+		// 			if (
+		// 				IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+		// 				!door.Outputs.Contains(room.Uuid) &&
+		// 				!room.Outputs.Contains(door.Uuid)
+		// 			)
+		// 			{
+		// 				room.Outputs.Add(door.Uuid);
+		// 				door.Outputs.Add(room.Uuid);
+		// 			}
+		// 	}
+		//
+		// var modelsWithOutputs = rooms.Concat(doors);
 
-		foreach (var model in modelsWithOutputs)
+		// foreach (var model in modelsWithOutputs)
+		// {
+		// 	result.AppendLine($"{model.Name} {model.Uuid}");
+		// 	foreach (var outputUuid in model.Outputs)
+		// 		result.AppendLine($"{outputUuid}");
+		// 	result.AppendLine();
+		// }
+
+		var levelElevations = new List<LevelElevation>();
+		for (var i = 0; i < modelObjectCollection.Count; i++)
 		{
-			result.AppendLine($"{model.Name} {model.Uuid}");
-			foreach (var outputUuid in model.Outputs)
-				result.AppendLine($"{outputUuid}");
-			result.AppendLine();
+			var model = modelObjectCollection.GetByIndex(i);
+			if (model.ObjectType == ObjectTypes.Level)
+			{
+				var level = (ILevel)model;
+				levelElevations.Add(new LevelElevation(model.uniqueId, model.Name, level.Elevation,
+					new List<ModelWithCoordinates>()));
+				result.AppendLine($"{model.Name} {model.uniqueId} {level.Elevation}");
+			}
 		}
 
+		var sortedLevelElevations = levelElevations.OrderBy(level => level.Elevation).ToList();
+		// add highest level
+		var highestLevel =
+			new LevelElevation(Guid.NewGuid(), "highest level", double.PositiveInfinity,
+				new List<ModelWithCoordinates>());
+		sortedLevelElevations.Add(highestLevel);
+
+		for (var i = 0; i < sortedLevelElevations.Count - 1; i++)
+		{
+			var downsideLevel = sortedLevelElevations[i];
+			var upsideLevel = sortedLevelElevations[i + 1];
+			foreach (var model in modelsWithCoordinates)
+				if (downsideLevel.Elevation <= model.Coordinates[0].Z &&
+				    model.Coordinates[0].Z <= upsideLevel.Elevation)
+					downsideLevel.ModelsWithCoordinates.Add(model);
+		}
+
+		sortedLevelElevations.Remove(highestLevel);
+
+		// add relationships
+		foreach (var level in sortedLevelElevations)
+		foreach (var room in level.ModelsWithCoordinates)
+			if (room.Sign == "Room")
+				for (var i = 0; i < room.Coordinates.Count - 1; i++)
+				{
+					var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
+					foreach (var door in level.ModelsWithCoordinates)
+						if (door.Sign == "DoorWayInt")
+							foreach (var doorPoint in door.Coordinates)
+								if (
+									IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+									!door.Outputs.Contains(room.Uuid) &&
+									!room.Outputs.Contains(door.Uuid)
+								)
+								{
+									room.Outputs.Add(door.Uuid);
+									door.Outputs.Add(room.Uuid);
+								}
+				}
+
+		// find output doors
+		foreach (var level in sortedLevelElevations)
+		foreach (var model in level.ModelsWithCoordinates)
+			if (model.Sign == "DoorWayInt" && model.Outputs.Count == 1)
+				model.Sign = "DoorWayOut";
+
+		// foreach (var room in rooms)
+		// 	for (var i = 0; i < room.Coordinates.Count - 1; i++)
+		// 	{
+		// 		var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
+		// 		foreach (var door in doors)
+		// 		foreach (var doorPoint in door.Coordinates)
+		// 			if (
+		// 				IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+		// 				!door.Outputs.Contains(room.Uuid) &&
+		// 				!room.Outputs.Contains(door.Uuid)
+		// 			)
+		// 			{
+		// 				room.Outputs.Add(door.Uuid);
+		// 				door.Outputs.Add(room.Uuid);
+		// 			}
+		// 	}
+		//
+		// var modelsWithOutputs = rooms.Concat(doors);
 		// result.AppendLine($"{model.Name} {model.Uuid}");
 		// foreach (var coordinates in model.Coordinates)
 		// result.AppendLine($"X: {coordinates.X} Y: {coordinates.Y} Z: {coordinates.Z}");
@@ -166,14 +246,47 @@ public class RengaToJsonPlugin : IPlugin
 		}*/
 		// }
 
+		var levels = new List<Level>();
+		foreach (var levelElevation in sortedLevelElevations)
+		{
+			var buildingElements = new List<BuildingElement>();
+			foreach (var model in levelElevation.ModelsWithCoordinates)
+			{
+				var points = new List<Point>();
+				foreach (var modelCoordinates in model.Coordinates)
+					points.Add(new Point(modelCoordinates.X / 1000, modelCoordinates.Y / 1000));
+
+				var coordinates = new List<Coordinates>();
+				coordinates.Add(new Coordinates(points));
+				buildingElements.Add(new BuildingElement(
+					model.Uuid,
+					model.Uuid,
+					model.Name,
+					0, // TODO: get sizeZ from renga
+					model.Sign,
+					coordinates,
+					model.Outputs
+				));
+			}
+
+			levels.Add(
+				new Level(
+					levelElevation.Name,
+					levelElevation.Elevation,
+					buildingElements
+				)
+			);
+		}
+
 		var buildingInfo = app.Project.BuildingInfo;
 		var addressInfo = buildingInfo.GetAddress();
 
 		var address = new Address(addressInfo.Town, "", "");
 		var devs = new List<int>();
-		var building = new Building(buildingInfo.Name, address, devs);
+		var building = new Building(buildingInfo.Name, address, levels, devs);
 
-		return result.ToString();
+		return JsonConvert.SerializeObject(building, Formatting.Indented);
+		// return result.ToString();
 		// return JsonConvert.SerializeObject(building, Formatting.Indented);
 	}
 
@@ -236,7 +349,7 @@ public class RengaToJsonPlugin : IPlugin
 
 							vertexes.Add(vertexes.First());
 							if (vertexes.All(x => x.Z == vertexes.First().Z))
-								// TODO: check on outside door
+								// TODO: check the outside door
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
 										modelObject.uniqueId,

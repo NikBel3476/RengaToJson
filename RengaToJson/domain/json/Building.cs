@@ -5,22 +5,20 @@ namespace RengaToJson.domain;
 
 public class Building
 {
-	public Building(string name, Address address, /*List<Level> levels,*/ List<int> devs)
+	public Building(string name, Address address, List<Level> levels, List<int> devs)
 	{
 		BuildingName = name;
 		Address = address;
-		// Levels = levels;
+		Levels = levels;
 		Devs = devs;
 	}
 
 	public List<int> Devs { get; set; }
-
 	// [JsonPropertyName("NameBuilding")]
 	[JsonProperty("NameBuilding")]
 	public string BuildingName { get; set; }
-
 	public Address Address { get; set; }
-
 	// [JsonPropertyName("Level")]
-	// private List<Level> Levels { get; set; }
+	[JsonProperty("Level")]
+	private List<Level> Levels { get; set; }
 }

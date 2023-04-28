@@ -13,7 +13,9 @@ public class Address
 
 	public string City { get; set; }
 	// [JsonPropertyName("StreetAddress")]
-	[JsonProperty("StreetAddress")] public string Street { get; set; }
+	[JsonProperty("StreetAddress")]
+	public string Street { get; set; }
 	// [JsonPropertyName("AddInfo")]
-	[JsonProperty("AddInfo")] public string AdditionalInfo { get; set; }
+	[JsonProperty("AddInfo")]
+	public string AdditionalInfo { get; set; }
 }

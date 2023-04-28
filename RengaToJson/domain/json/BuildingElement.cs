@@ -12,7 +12,8 @@ public class BuildingElement
 		string name,
 		double sizeZ,
 		string sign,
-		List<Coordinates> coordinates
+		List<Coordinates> coordinates,
+		List<Guid> outputs
 	)
 	{
 		Uuid = uuid;
@@ -21,14 +22,19 @@ public class BuildingElement
 		SizeZ = sizeZ;
 		Sign = sign;
 		Coordinates = coordinates;
+		Outputs = outputs;
 	}
 
 	// [JsonPropertyName("@")]
-	[JsonProperty("@")] public Guid Uuid { get; set; }
+	[JsonProperty("@")]
+	public Guid Uuid { get; set; }
 	public Guid Id { get; set; }
 	public string Name { get; set; }
 	public double SizeZ { get; set; }
 	public string Sign { get; set; }
 	// [JsonPropertyName("XY")]
-	[JsonProperty("XY")] public List<Coordinates> Coordinates { get; set; }
+	[JsonProperty("XY")]
+	public List<Coordinates> Coordinates { get; set; }
+	[JsonProperty("Output")]
+	public List<Guid> Outputs { get; set; }
 }
