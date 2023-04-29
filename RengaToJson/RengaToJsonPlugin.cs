@@ -115,7 +115,7 @@ public class RengaToJsonPlugin : IPlugin
 			if (model.ObjectType == ObjectTypes.Level)
 			{
 				var level = (ILevel)model;
-				levelElevations.Add(new LevelElevation(model.uniqueId, model.Name, level.Elevation,
+				levelElevations.Add(new LevelElevation(model.uniqueId, model.Name, Math.Round(level.Elevation),
 					new List<ModelWithCoordinates>()));
 				result.AppendLine($"{model.Name} {model.uniqueId} {level.Elevation}");
 			}
@@ -128,13 +128,16 @@ public class RengaToJsonPlugin : IPlugin
 				new List<ModelWithCoordinates>());
 		sortedLevelElevations.Add(highestLevel);
 
+		foreach (var levelElevation in sortedLevelElevations)
+			result.AppendLine($"{levelElevation.Name} {levelElevation.Elevation}");
+
 		for (var i = 0; i < sortedLevelElevations.Count - 1; i++)
 		{
 			var downsideLevel = sortedLevelElevations[i];
 			var upsideLevel = sortedLevelElevations[i + 1];
 			foreach (var model in modelsWithCoordinates)
 				if (downsideLevel.Elevation <= model.Coordinates[0].Z &&
-				    model.Coordinates[0].Z <= upsideLevel.Elevation)
+				    model.Coordinates[0].Z < upsideLevel.Elevation)
 					downsideLevel.ModelsWithCoordinates.Add(model);
 		}
 
@@ -254,7 +257,13 @@ public class RengaToJsonPlugin : IPlugin
 			{
 				var points = new List<Point>();
 				foreach (var modelCoordinates in model.Coordinates)
-					points.Add(new Point(modelCoordinates.X / 1000, modelCoordinates.Y / 1000));
+					points.Add(
+						new Point(
+							modelCoordinates.X / 1000,
+							-modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
+							modelCoordinates.Z / 1000
+						)
+					);
 
 				var coordinates = new List<Coordinates>();
 				coordinates.Add(new Coordinates(points));
@@ -285,8 +294,9 @@ public class RengaToJsonPlugin : IPlugin
 		var devs = new List<int>();
 		var building = new Building(buildingInfo.Name, address, levels, devs);
 
-		return JsonConvert.SerializeObject(building, Formatting.Indented);
+		result.AppendLine(JsonConvert.SerializeObject(building, Formatting.Indented));
 		// return result.ToString();
+		return JsonConvert.SerializeObject(building, Formatting.Indented);
 		// return JsonConvert.SerializeObject(building, Formatting.Indented);
 	}
 
