@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
 using Renga;
 using Renga.GridTypes;
-using RengaToJson.domain;
+using RengaToJson.Domain.Json;
 using RengaToJson.domain.Renga;
 
 namespace RengaToJson;
@@ -67,46 +66,11 @@ public class RengaToJsonPlugin : IPlugin
 
 	private string TraverseModelObjects()
 	{
-		var modelCollection = app.Project.Model.GetObjects();
 		var objects3D = app.Project.DataExporter.GetObjects3D();
-
-		var result = new StringBuilder("Renga levels, walls and columns:\n\n");
 
 		var modelObjectCollection = app.Project.Model.GetObjects();
 
-		result.AppendLine($"objects3DCount: {objects3D.Count}");
-
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
-		var rooms = modelsWithCoordinates.Where(x => x.Sign == "Room").ToList();
-		var doors = modelsWithCoordinates.Where(x => x.Sign == "DoorWayInt").ToList();
-
-		// add relationships
-		// foreach (var room in rooms)
-		// 	for (var i = 0; i < room.Coordinates.Count - 1; i++)
-		// 	{
-		// 		var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
-		// 		foreach (var door in doors)
-		// 		foreach (var doorPoint in door.Coordinates)
-		// 			if (
-		// 				IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-		// 				!door.Outputs.Contains(room.Uuid) &&
-		// 				!room.Outputs.Contains(door.Uuid)
-		// 			)
-		// 			{
-		// 				room.Outputs.Add(door.Uuid);
-		// 				door.Outputs.Add(room.Uuid);
-		// 			}
-		// 	}
-		//
-		// var modelsWithOutputs = rooms.Concat(doors);
-
-		// foreach (var model in modelsWithOutputs)
-		// {
-		// 	result.AppendLine($"{model.Name} {model.Uuid}");
-		// 	foreach (var outputUuid in model.Outputs)
-		// 		result.AppendLine($"{outputUuid}");
-		// 	result.AppendLine();
-		// }
 
 		var levelElevations = new List<LevelElevation>();
 		for (var i = 0; i < modelObjectCollection.Count; i++)
@@ -117,7 +81,6 @@ public class RengaToJsonPlugin : IPlugin
 				var level = (ILevel)model;
 				levelElevations.Add(new LevelElevation(model.uniqueId, model.Name, Math.Round(level.Elevation),
 					new List<ModelWithCoordinates>()));
-				result.AppendLine($"{model.Name} {model.uniqueId} {level.Elevation}");
 			}
 		}
 
@@ -127,9 +90,6 @@ public class RengaToJsonPlugin : IPlugin
 			new LevelElevation(Guid.NewGuid(), "highest level", double.PositiveInfinity,
 				new List<ModelWithCoordinates>());
 		sortedLevelElevations.Add(highestLevel);
-
-		foreach (var levelElevation in sortedLevelElevations)
-			result.AppendLine($"{levelElevation.Name} {levelElevation.Elevation}");
 
 		for (var i = 0; i < sortedLevelElevations.Count - 1; i++)
 		{
@@ -170,85 +130,7 @@ public class RengaToJsonPlugin : IPlugin
 			if (model.Sign == "DoorWayInt" && model.Outputs.Count == 1)
 				model.Sign = "DoorWayOut";
 
-		// foreach (var room in rooms)
-		// 	for (var i = 0; i < room.Coordinates.Count - 1; i++)
-		// 	{
-		// 		var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
-		// 		foreach (var door in doors)
-		// 		foreach (var doorPoint in door.Coordinates)
-		// 			if (
-		// 				IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-		// 				!door.Outputs.Contains(room.Uuid) &&
-		// 				!room.Outputs.Contains(door.Uuid)
-		// 			)
-		// 			{
-		// 				room.Outputs.Add(door.Uuid);
-		// 				door.Outputs.Add(room.Uuid);
-		// 			}
-		// 	}
-		//
-		// var modelsWithOutputs = rooms.Concat(doors);
-		// result.AppendLine($"{model.Name} {model.Uuid}");
-		// foreach (var coordinates in model.Coordinates)
-		// result.AppendLine($"X: {coordinates.X} Y: {coordinates.Y} Z: {coordinates.Z}");
-		// for (var i = 0; i < objects3D.Count; i++)
-		// {
-		// 	var object3D = objects3D.Get(i);
-		// 	var modelObject = modelObjectCollection.GetById(object3D.ModelObjectId);
-		// 	var objectType = modelObject.ObjectType;
-		//
-		// 	var meshes = new List<IMesh>();
-		// 	var grids = new List<IGrid>();
-		// 	var vertexes = new List<FloatPoint3D>();
-		// 	for (var meshIndex = 0; meshIndex < object3D.MeshCount; meshIndex++)
-		// 	{
-		// 		var mesh = object3D.GetMesh(meshIndex);
-		// 		meshes.Add(mesh);
-		// 		for (var gridIndex = 0; gridIndex < mesh.GridCount; gridIndex++)
-		// 		{
-		// 			var grid = mesh.GetGrid(gridIndex);
-		// 			if (objectType == ObjectTypes.Room)
-		// 			{
-		// 				if (grid.GridType == (int)Room.Floor)
-		// 				{
-		// 					grids.Add(grid);
-		// 					for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
-		// 					{
-		// 						var vertex = grid.GetVertex(vertexIndex);
-		// 						vertexes.Add(vertex);
-		// 						result.AppendLine($"Name: ${modelObject.Name}");
-		// 						result.AppendLine($"Coordinates: X: {vertex.X} Y: {vertex.Y} Z: {vertex.Z}");
-		// 					}
-		// 				}
-		// 			}
-		// 			else if (objectType == ObjectTypes.Door)
-		// 			{
-		// 				if (grid.GridType == (int)Door.Reveal)
-		// 					for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
-		// 					{
-		// 						var vertex = grid.GetVertex(vertexIndex);
-		// 						result.AppendLine($"Name: ${modelObject.Name}");
-		// 						result.AppendLine($"Coordinates: X: {vertex.X} Y: {vertex.Y} Z: {vertex.Z}");
-		// 					}
-		// 			}
-		// 		}
-		// 	}
-
-		/*else if (objectType == ObjectTypes.Door)
-		{
-			var properties = modelObject.GetProperties();
-			if (properties != null)
-			{
-				var ids = properties.GetIds();
-				for (var propertyIndex = 0; propertyIndex < ids.Count; propertyIndex++)
-				{
-					var property = properties.Get(ids.Get(propertyIndex));
-					result.AppendLine($"{property.Name} {}")
-				}
-			}
-		}*/
-		// }
-
+		// create models to export json
 		var levels = new List<Level>();
 		foreach (var levelElevation in sortedLevelElevations)
 		{
@@ -294,23 +176,8 @@ public class RengaToJsonPlugin : IPlugin
 		var devs = new List<int>();
 		var building = new Building(buildingInfo.Name, address, levels, devs);
 
-		result.AppendLine(JsonConvert.SerializeObject(building, Formatting.Indented));
-		// return result.ToString();
 		return JsonConvert.SerializeObject(building, Formatting.Indented);
-		// return JsonConvert.SerializeObject(building, Formatting.Indented);
 	}
-
-	// private string ModelProperties()
-	// {
-	// }
-
-	// private object GetPropertyValue(IProperty property)
-	// {
-	// 	switch (property.Type)
-	// 	{
-	// 		case PropertyType
-	// 	}
-	// }
 
 	private List<ModelWithCoordinates> GetModelsWithCoordinates(
 		IExportedObject3DCollection objects3D,

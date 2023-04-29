@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace RengaToJson.domain;
+namespace RengaToJson.Domain.Json;
 
 public class Point
 {

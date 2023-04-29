@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace RengaToJson.domain;
+namespace RengaToJson.Domain.Json;
 
 public class Building
 {

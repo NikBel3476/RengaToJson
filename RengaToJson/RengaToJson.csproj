@@ -48,17 +48,15 @@
         <Reference Include="System.Xml" />
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="domain\json\Address.cs" />
-        <Compile Include="domain\json\Building.cs" />
-        <Compile Include="domain\json\BuildingElement.cs" />
-        <Compile Include="domain\json\Coordinates.cs" />
-        <Compile Include="domain\json\Level.cs" />
-        <Compile Include="domain\json\Point.cs" />
-        <Compile Include="domain\Renga\LevelElevation.cs" />
-        <Compile Include="domain\Renga\LineSegment.cs" />
-        <Compile Include="domain\Renga\ModelParameters.cs" />
-        <Compile Include="domain\Renga\ModelProperties.cs" />
-        <Compile Include="domain\Renga\ModelWithCoordinates.cs" />
+        <Compile Include="Domain\Json\Address.cs" />
+        <Compile Include="Domain\Json\Building.cs" />
+        <Compile Include="Domain\Json\BuildingElement.cs" />
+        <Compile Include="Domain\Json\Coordinates.cs" />
+        <Compile Include="Domain\Json\Level.cs" />
+        <Compile Include="Domain\Json\Point.cs" />
+        <Compile Include="Domain\Renga\LevelElevation.cs" />
+        <Compile Include="Domain\Renga\LineSegment.cs" />
+        <Compile Include="Domain\Renga\ModelWithCoordinates.cs" />
         <Compile Include="RengaToJsonPlugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
