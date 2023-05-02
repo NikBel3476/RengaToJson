@@ -13,6 +13,9 @@ namespace RengaToJson;
 public class RengaToJsonPlugin : IPlugin
 {
 	private const string PluginName = "Export to JSON";
+	private const string saveFileDialogTitle = "Save json from renga file";
+	private const string saveFileDefaultPath = "";
+	private const string saveFileFilter = "Json files (*.json)|*.json";
 	private Application app;
 	private ActionEventSource events;
 
@@ -28,9 +31,9 @@ public class RengaToJsonPlugin : IPlugin
 		events.Triggered += (s, e) =>
 		{
 			var filePath = ui.ShowSaveFileDialog(
-				"Save json from renga file",
-				"",
-				"Json files (*.json)|*.json"
+				saveFileDialogTitle,
+				saveFileDefaultPath,
+				saveFileFilter
 			);
 
 			if (filePath != "")
@@ -46,12 +49,6 @@ public class RengaToJsonPlugin : IPlugin
 						exception.Message
 					);
 				}
-
-			// var textInMessageBox = filePath != "" ? TraverseModelObjects() : "No selected file";
-			// ui.ShowMessageBox(MessageIcon.MessageIcon_Info,
-			//     "Model object list",
-			//     filePath
-			// );
 		};
 		panelExtension.AddToolButton(action);
 		ui.AddExtensionToPrimaryPanel(panelExtension);
@@ -67,7 +64,6 @@ public class RengaToJsonPlugin : IPlugin
 	private string TraverseModelObjects()
 	{
 		var objects3D = app.Project.DataExporter.GetObjects3D();
-
 		var modelObjectCollection = app.Project.Model.GetObjects();
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
@@ -105,22 +101,25 @@ public class RengaToJsonPlugin : IPlugin
 
 		// add relationships
 		foreach (var level in sortedLevelElevations)
-		foreach (var room in level.ModelsWithCoordinates)
-			if (room.Sign == "Room")
-				for (var i = 0; i < room.Coordinates.Count - 1; i++)
+		foreach (var doorRelationModel in level.ModelsWithCoordinates)
+			if (doorRelationModel.Sign == "Room" || doorRelationModel.Sign == "Staircase")
+				for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
 				{
-					var lineSegment = new LineSegment(room.Coordinates[i], room.Coordinates[i + 1]);
+					var lineSegment = new LineSegment(
+						doorRelationModel.Coordinates[i],
+						doorRelationModel.Coordinates[i + 1]
+					);
 					foreach (var door in level.ModelsWithCoordinates)
 						if (door.Sign == "DoorWayInt")
 							foreach (var doorPoint in door.Coordinates)
 								if (
 									IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-									!door.Outputs.Contains(room.Uuid) &&
-									!room.Outputs.Contains(door.Uuid)
+									!door.Outputs.Contains(doorRelationModel.Uuid) &&
+									!doorRelationModel.Outputs.Contains(door.Uuid)
 								)
 								{
-									room.Outputs.Add(door.Uuid);
-									door.Outputs.Add(room.Uuid);
+									doorRelationModel.Outputs.Add(door.Uuid);
+									door.Outputs.Add(doorRelationModel.Uuid);
 								}
 				}
 
@@ -210,8 +209,7 @@ public class RengaToJsonPlugin : IPlugin
 									modelObject.uniqueId,
 									modelObject.Name,
 									vertexes,
-									"Room",
-									new List<Guid>()
+									"Room"
 								)
 							);
 						}
@@ -226,14 +224,36 @@ public class RengaToJsonPlugin : IPlugin
 
 							vertexes.Add(vertexes.First());
 							if (vertexes.All(x => x.Z == vertexes.First().Z))
-								// TODO: check the outside door
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
 										modelObject.uniqueId,
 										modelObject.Name,
 										vertexes,
-										"DoorWayInt",
-										new List<Guid>()
+										"DoorWayInt"
+									)
+								);
+						}
+					}
+					else if (objectType == ObjectTypes.Stair)
+					{
+						if (grid.GridType == (int)Stairway.Top)
+						{
+							var vertexes = new List<FloatPoint3D>();
+							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
+								vertexes.Add(grid.GetVertex(vertexIndex));
+
+							var existingStairway =
+								modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId));
+
+							if (existingStairway != null)
+								existingStairway.Coordinates.AddRange(vertexes);
+							else
+								modelsWithCoordinates.Add(
+									new ModelWithCoordinates(
+										modelObject.uniqueId,
+										modelObject.Name,
+										vertexes,
+										"Staircase"
 									)
 								);
 						}

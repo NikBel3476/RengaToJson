@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Renga;
 
 namespace RengaToJson.Domain.Json;
 
@@ -9,6 +10,13 @@ public class Point
 		X = x;
 		Y = y;
 		Z = z;
+	}
+
+	public Point(FloatPoint3D point3D)
+	{
+		X = point3D.X;
+		Y = point3D.Y;
+		Z = point3D.Z;
 	}
 
 	[JsonProperty("x")]
