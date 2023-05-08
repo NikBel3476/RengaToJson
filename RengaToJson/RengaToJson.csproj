@@ -48,6 +48,7 @@
         <Reference Include="System.Xml" />
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="Domain\Exceptions\NotFoundRelationshipException.cs" />
         <Compile Include="Domain\Json\Address.cs" />
         <Compile Include="Domain\Json\Building.cs" />
         <Compile Include="Domain\Json\BuildingElement.cs" />

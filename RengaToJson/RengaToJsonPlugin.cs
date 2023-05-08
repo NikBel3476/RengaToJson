@@ -5,6 +5,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Renga;
 using Renga.GridTypes;
+using RengaToJson.Domain.Exceptions;
 using RengaToJson.Domain.Json;
 using RengaToJson.domain.Renga;
 
@@ -13,9 +14,9 @@ namespace RengaToJson;
 public class RengaToJsonPlugin : IPlugin
 {
 	private const string PluginName = "Export to JSON";
-	private const string saveFileDialogTitle = "Save json from renga file";
-	private const string saveFileDefaultPath = "";
-	private const string saveFileFilter = "Json files (*.json)|*.json";
+	private const string SaveFileDialogTitle = "Save json from renga file";
+	private const string SaveFileDefaultPath = "";
+	private const string SaveFileFilter = "Json files (*.json)|*.json";
 	private Application app;
 	private ActionEventSource events;
 
@@ -23,6 +24,7 @@ public class RengaToJsonPlugin : IPlugin
 	{
 		app = new Application();
 		var ui = app.UI;
+		var selection = app.Selection;
 		var panelExtension = ui.CreateUIPanelExtension();
 		var action = ui.CreateAction();
 		action.ToolTip = PluginName;
@@ -31,9 +33,9 @@ public class RengaToJsonPlugin : IPlugin
 		events.Triggered += (s, e) =>
 		{
 			var filePath = ui.ShowSaveFileDialog(
-				saveFileDialogTitle,
-				saveFileDefaultPath,
-				saveFileFilter
+				SaveFileDialogTitle,
+				SaveFileDefaultPath,
+				SaveFileFilter
 			);
 
 			if (filePath != "")
@@ -41,6 +43,14 @@ public class RengaToJsonPlugin : IPlugin
 				{
 					var jsonString = TraverseModelObjects();
 					File.WriteAllText(filePath, jsonString);
+				}
+				catch (NotFoundRelationshipException exception)
+				{
+					ui.ShowMessageBox(MessageIcon.MessageIcon_Info,
+						PluginName,
+						exception.Message
+					);
+					selection.SetSelectedObjects(new[] { exception.Model.Id });
 				}
 				catch (Exception exception)
 				{
@@ -75,32 +85,50 @@ public class RengaToJsonPlugin : IPlugin
 			if (model.ObjectType == ObjectTypes.Level)
 			{
 				var level = (ILevel)model;
-				levelElevations.Add(new LevelElevation(model.uniqueId, model.Name, Math.Round(level.Elevation),
-					new List<ModelWithCoordinates>()));
+				levelElevations.Add(
+					new LevelElevation(
+						model.uniqueId,
+						model.Name,
+						Math.Round(level.Elevation),
+						new List<ModelWithCoordinates>()
+					)
+				);
 			}
 		}
 
-		var sortedLevelElevations = levelElevations.OrderBy(level => level.Elevation).ToList();
+		var sortedLevelsByElevation = levelElevations.OrderBy(level => level.Elevation).ToList();
 		// add highest level
-		var highestLevel =
-			new LevelElevation(Guid.NewGuid(), "highest level", double.PositiveInfinity,
-				new List<ModelWithCoordinates>());
-		sortedLevelElevations.Add(highestLevel);
+		var highestLevel = new LevelElevation(
+			Guid.NewGuid(),
+			"highest level",
+			double.PositiveInfinity,
+			new List<ModelWithCoordinates>()
+		);
+		sortedLevelsByElevation.Add(highestLevel);
 
-		for (var i = 0; i < sortedLevelElevations.Count - 1; i++)
+		for (var i = 0; i < sortedLevelsByElevation.Count - 1; i++)
 		{
-			var downsideLevel = sortedLevelElevations[i];
-			var upsideLevel = sortedLevelElevations[i + 1];
+			var downsideLevel = sortedLevelsByElevation[i];
+			var upsideLevel = sortedLevelsByElevation[i + 1];
+			// TODO: create special case for stairways
 			foreach (var model in modelsWithCoordinates)
-				if (downsideLevel.Elevation <= model.Coordinates[0].Z &&
-				    model.Coordinates[0].Z < upsideLevel.Elevation)
+				if (
+					downsideLevel.Elevation <= model.Coordinates[0].Z &&
+					model.Coordinates[0].Z < upsideLevel.Elevation
+				)
+				{
+					if (model.Sign == "DoorWayInt")
+						model.Coordinates.ForEach(coordinates =>
+							coordinates.Z = Convert.ToSingle(downsideLevel.Elevation));
+
 					downsideLevel.ModelsWithCoordinates.Add(model);
+				}
 		}
 
-		sortedLevelElevations.Remove(highestLevel);
+		sortedLevelsByElevation.Remove(highestLevel);
 
 		// add relationships
-		foreach (var level in sortedLevelElevations)
+		foreach (var level in sortedLevelsByElevation)
 		foreach (var doorRelationModel in level.ModelsWithCoordinates)
 			if (doorRelationModel.Sign == "Room" || doorRelationModel.Sign == "Staircase")
 				for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
@@ -124,14 +152,20 @@ public class RengaToJsonPlugin : IPlugin
 				}
 
 		// find output doors
-		foreach (var level in sortedLevelElevations)
+		foreach (var level in sortedLevelsByElevation)
 		foreach (var model in level.ModelsWithCoordinates)
-			if (model.Sign == "DoorWayInt" && model.Outputs.Count == 1)
-				model.Sign = "DoorWayOut";
+			if (model.Sign == "DoorWayInt")
+				if (model.Outputs.Count == 0)
+					throw new NotFoundRelationshipException(
+						$"Failed to find outputs:\n{model.Name}\n{model.Uuid}",
+						model
+					);
+				else if (model.Outputs.Count == 1)
+					model.Sign = "DoorWayOut";
 
 		// create models to export json
 		var levels = new List<Level>();
-		foreach (var levelElevation in sortedLevelElevations)
+		foreach (var levelElevation in sortedLevelsByElevation)
 		{
 			var buildingElements = new List<BuildingElement>();
 			foreach (var model in levelElevation.ModelsWithCoordinates)
@@ -206,6 +240,7 @@ public class RengaToJsonPlugin : IPlugin
 							vertexes.Add(vertexes.First());
 							modelsWithCoordinates.Add(
 								new ModelWithCoordinates(
+									modelObject.Id,
 									modelObject.uniqueId,
 									modelObject.Name,
 									vertexes,
@@ -223,9 +258,10 @@ public class RengaToJsonPlugin : IPlugin
 								vertexes.Add(grid.GetVertex(vertexIndex));
 
 							vertexes.Add(vertexes.First());
-							if (vertexes.All(x => x.Z == vertexes.First().Z))
+							if (vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01f)))
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
+										modelObject.Id,
 										modelObject.uniqueId,
 										modelObject.Name,
 										vertexes,
@@ -236,7 +272,7 @@ public class RengaToJsonPlugin : IPlugin
 					}
 					else if (objectType == ObjectTypes.Stair)
 					{
-						if (grid.GridType == (int)Stairway.Top)
+						if (grid.GridType == (int)Stairway.Bottom)
 						{
 							var vertexes = new List<FloatPoint3D>();
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
@@ -250,6 +286,7 @@ public class RengaToJsonPlugin : IPlugin
 							else
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
+										modelObject.Id,
 										modelObject.uniqueId,
 										modelObject.Name,
 										vertexes,
@@ -270,9 +307,26 @@ public class RengaToJsonPlugin : IPlugin
 		var a = lineSegment.P1;
 		var b = point;
 		var c = lineSegment.P2;
-		return IsPointOnTheLine(point, lineSegment) &&
-		       Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
-		       Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+		// return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f);
+
+		// return IsPointOnTheLine(point, lineSegment) &&
+		//        Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
+		//        Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+
+		var dxc = b.X - a.X;
+		var dyc = b.Y - a.Y;
+
+		var dxl = c.X - a.X;
+		var dyl = c.Y - a.Y;
+
+		var cross = dxc * dyl - dyc * dxl;
+
+		if (!NearlyEqual(cross, 0f, 0.01f))
+			return false;
+
+		if (Math.Abs(dxl) >= Math.Abs(dyl))
+			return dxl > 0 ? a.X <= b.X && b.X <= c.X : c.X <= b.X && b.X <= a.X;
+		return dyl > 0 ? a.Y <= b.Y && b.Y <= c.Y : c.Y <= b.Y && b.Y <= a.Y;
 	}
 
 	private bool IsPointOnTheLine(FloatPoint3D point, LineSegment lineSegment)
@@ -280,6 +334,29 @@ public class RengaToJsonPlugin : IPlugin
 		var a = lineSegment.P1;
 		var b = point;
 		var c = lineSegment.P2;
-		return a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y) == 0;
+		var result = a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y);
+
+		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.01f);
+	}
+
+	private bool NearlyEqual(float a, float b, float epsilon)
+	{
+		var absA = Math.Abs(a);
+		var absB = Math.Abs(b);
+		var diff = Math.Abs(a - b);
+
+		if (a == b) // shortcut, handles infinities
+			return true;
+		if (a == 0 || b == 0 || absA + absB < float.MinValue)
+			// a or b is zero or both are extremely close to it
+			// relative error is less meaningful here
+			return diff < epsilon * float.MinValue;
+		// use relative error
+		return diff / (absA + absB) < epsilon;
+	}
+
+	private float Distance(FloatPoint3D p1, FloatPoint3D p2)
+	{
+		return Convert.ToSingle(Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2)));
 	}
 }

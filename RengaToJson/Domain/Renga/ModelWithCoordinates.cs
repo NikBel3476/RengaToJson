@@ -22,12 +22,14 @@ public class ModelWithCoordinates
 	}
 
 	public ModelWithCoordinates(
+		int id,
 		Guid uuid,
 		string name,
 		List<FloatPoint3D> coordinates,
 		string sign
 	)
 	{
+		Id = id;
 		Uuid = uuid;
 		Name = name;
 		Coordinates = coordinates;
@@ -35,6 +37,7 @@ public class ModelWithCoordinates
 		Outputs = new List<Guid>();
 	}
 
+	public int Id { get; set; }
 	public Guid Uuid { get; set; }
 	public string Name { get; set; }
 	public List<FloatPoint3D> Coordinates { get; set; }
