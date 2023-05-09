@@ -19,3 +19,5 @@ jobs:
         run: nuget restore RengaToJson.sln
       - name: Build
         run: msbuild RengaToJson.sln /p:platform="Any CPU" /p:configuration="Release"
+      - name: Run tests
+        run: packages\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe RengaToJson.Tests\bin\Release\RengaToJson.Tests.dll

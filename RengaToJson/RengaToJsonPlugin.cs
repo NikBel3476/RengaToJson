@@ -355,7 +355,8 @@ public class RengaToJsonPlugin : IPlugin
 		return diff / (absA + absB) < epsilon;
 	}
 
-	private float Distance(FloatPoint3D p1, FloatPoint3D p2)
+	// TODO: move to external class
+	public static float Distance(FloatPoint3D p1, FloatPoint3D p2)
 	{
 		return Convert.ToSingle(Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2)));
 	}
