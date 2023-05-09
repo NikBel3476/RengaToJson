@@ -1,0 +1,19 @@
+﻿name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: build-${{matrix.os}}
+    runs-on: ${{ matrix.os }}
+    environment: test
+    strategy:
+      matrix:
+        os: [ windows-latest ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Restore dependencies
+        run: nuget restore RengaToJson.sln
+      - name: Build
+        run: msbuild.exe RengaToJson.sln /p:platform="Any CPU" /p:configuration="Release"
