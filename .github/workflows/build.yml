@@ -16,4 +16,4 @@ jobs:
       - name: Restore dependencies
         run: nuget restore RengaToJson.sln
       - name: Build
-        run: msbuild.exe RengaToJson.sln /p:platform="Any CPU" /p:configuration="Release"
+        run: msbuild RengaToJson.sln /p:platform="Any CPU" /p:configuration="Release"
