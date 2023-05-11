@@ -160,8 +160,7 @@ public class RengaToJsonPlugin : IPlugin
 						$"Failed to find outputs:\n{model.Name}\n{model.Uuid}",
 						model
 					);
-				else if (model.Outputs.Count == 1)
-					model.Sign = "DoorWayOut";
+				else if (model.Outputs.Count == 1) model.Sign = "DoorWayOut";
 
 		// create models to export json
 		var levels = new List<Level>();
@@ -238,15 +237,16 @@ public class RengaToJsonPlugin : IPlugin
 								vertexes.Add(grid.GetVertex(vertexIndex));
 
 							vertexes.Add(vertexes.First());
-							modelsWithCoordinates.Add(
-								new ModelWithCoordinates(
-									modelObject.Id,
-									modelObject.uniqueId,
-									modelObject.Name,
-									vertexes,
-									"Room"
-								)
-							);
+							if (modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId)) == null)
+								modelsWithCoordinates.Add(
+									new ModelWithCoordinates(
+										modelObject.Id,
+										modelObject.uniqueId,
+										modelObject.Name,
+										vertexes,
+										"Room"
+									)
+								);
 						}
 					}
 					else if (objectType == ObjectTypes.Door)
@@ -258,7 +258,10 @@ public class RengaToJsonPlugin : IPlugin
 								vertexes.Add(grid.GetVertex(vertexIndex));
 
 							vertexes.Add(vertexes.First());
-							if (vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01f)))
+							if (
+								vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01f))
+								&& modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId)) == null
+							)
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
 										modelObject.Id,
