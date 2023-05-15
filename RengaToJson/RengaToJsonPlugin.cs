@@ -155,9 +155,9 @@ public class RengaToJsonPlugin : IPlugin
 		foreach (var level in sortedLevelsByElevation)
 		foreach (var model in level.ModelsWithCoordinates)
 			if (model.Sign == "DoorWayInt")
-				if (model.Outputs.Count == 0)
+				if (model.Outputs.Count < 1 || model.Outputs.Count > 2)
 					throw new NotFoundRelationshipException(
-						$"Failed to find outputs:\n{model.Name}\n{model.Uuid}",
+						$"\n{model.Name}\n{model.Uuid}\nhas {model.Outputs.Count} outputs",
 						model
 					);
 				else if (model.Outputs.Count == 1) model.Sign = "DoorWayOut";
@@ -312,24 +312,24 @@ public class RengaToJsonPlugin : IPlugin
 		var c = lineSegment.P2;
 		// return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f);
 
-		// return IsPointOnTheLine(point, lineSegment) &&
-		//        Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
-		//        Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+		return IsPointOnTheLine(point, lineSegment) &&
+		       Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
+		       Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
 
-		var dxc = b.X - a.X;
-		var dyc = b.Y - a.Y;
-
-		var dxl = c.X - a.X;
-		var dyl = c.Y - a.Y;
-
-		var cross = dxc * dyl - dyc * dxl;
-
-		if (!NearlyEqual(cross, 0f, 0.01f))
-			return false;
-
-		if (Math.Abs(dxl) >= Math.Abs(dyl))
-			return dxl > 0 ? a.X <= b.X && b.X <= c.X : c.X <= b.X && b.X <= a.X;
-		return dyl > 0 ? a.Y <= b.Y && b.Y <= c.Y : c.Y <= b.Y && b.Y <= a.Y;
+		// var dxc = b.X - a.X;
+		// var dyc = b.Y - a.Y;
+		//
+		// var dxl = c.X - a.X;
+		// var dyl = c.Y - a.Y;
+		//
+		// var cross = dxc * dyl - dyc * dxl;
+		//
+		// if (!NearlyEqual(cross, 0f, 0.01f))
+		// 	return false;
+		//
+		// if (Math.Abs(dxl) >= Math.Abs(dyl))
+		// 	return dxl > 0 ? a.X <= b.X && b.X <= c.X : c.X <= b.X && b.X <= a.X;
+		// return dyl > 0 ? a.Y <= b.Y && b.Y <= c.Y : c.Y <= b.Y && b.Y <= a.Y;
 	}
 
 	private bool IsPointOnTheLine(FloatPoint3D point, LineSegment lineSegment)
