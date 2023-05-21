@@ -174,7 +174,7 @@ public class RengaToJsonPlugin : IPlugin
 					points.Add(
 						new Point(
 							modelCoordinates.X / 1000,
-							-modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
+							modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
 							modelCoordinates.Z / 1000
 						)
 					);
