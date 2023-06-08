@@ -78,6 +78,7 @@ public class RengaToJsonPlugin : IPlugin
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
 
+		// collect all building levels
 		var levelElevations = new List<LevelElevation>();
 		for (var i = 0; i < modelObjectCollection.Count; i++)
 		{
@@ -106,6 +107,7 @@ public class RengaToJsonPlugin : IPlugin
 		);
 		sortedLevelsByElevation.Add(highestLevel);
 
+		// split models by levels
 		for (var i = 0; i < sortedLevelsByElevation.Count - 1; i++)
 		{
 			var downsideLevel = sortedLevelsByElevation[i];
@@ -118,8 +120,12 @@ public class RengaToJsonPlugin : IPlugin
 				)
 				{
 					if (model.Sign == "DoorWayInt")
-						model.Coordinates.ForEach(coordinates =>
-							coordinates.Z = Convert.ToSingle(downsideLevel.Elevation));
+						model.Coordinates = model.Coordinates.Select(coordinates =>
+							{
+								coordinates.Z = Convert.ToSingle(downsideLevel.Elevation);
+								return coordinates;
+							})
+							.ToList();
 
 					downsideLevel.ModelsWithCoordinates.Add(model);
 				}
@@ -128,28 +134,78 @@ public class RengaToJsonPlugin : IPlugin
 		sortedLevelsByElevation.Remove(highestLevel);
 
 		// add relationships
+		LevelElevation? previousLevel = null;
 		foreach (var level in sortedLevelsByElevation)
-		foreach (var doorRelationModel in level.ModelsWithCoordinates)
-			if (doorRelationModel.Sign == "Room" || doorRelationModel.Sign == "Staircase")
-				for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
-				{
-					var lineSegment = new LineSegment(
-						doorRelationModel.Coordinates[i],
-						doorRelationModel.Coordinates[i + 1]
-					);
-					foreach (var door in level.ModelsWithCoordinates)
-						if (door.Sign == "DoorWayInt")
-							foreach (var doorPoint in door.Coordinates)
-								if (
-									IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-									!door.Outputs.Contains(doorRelationModel.Uuid) &&
-									!doorRelationModel.Outputs.Contains(door.Uuid)
-								)
+		{
+			foreach (var door in level.ModelsWithCoordinates)
+				if (door.Sign == "DoorWayInt")
+					foreach (var doorPoint in door.Coordinates)
+					{
+						foreach (var doorRelationModel in level.ModelsWithCoordinates)
+							if (doorRelationModel.Sign == "Room")
+								for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
 								{
-									doorRelationModel.Outputs.Add(door.Uuid);
-									door.Outputs.Add(doorRelationModel.Uuid);
+									var lineSegment = new LineSegment(
+										doorRelationModel.Coordinates[i],
+										doorRelationModel.Coordinates[i + 1]
+									);
+									if (
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(doorRelationModel.Uuid) &&
+										!doorRelationModel.Outputs.Contains(door.Uuid)
+									)
+									{
+										doorRelationModel.Outputs.Add(door.Uuid);
+										door.Outputs.Add(doorRelationModel.Uuid);
+									}
 								}
-				}
+							else if (doorRelationModel.Sign == "Staircase")
+								for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
+								{
+									var lineSegment = new LineSegment(
+										doorRelationModel.Coordinates[i],
+										doorRelationModel.Coordinates[i + 1]
+									);
+									if (
+										NearlyEqual(doorPoint.Z, lineSegment.P1.Z, 0.1f) &&
+										NearlyEqual(doorPoint.Z, lineSegment.P2.Z, 0.1f) &&
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(doorRelationModel.Uuid) &&
+										!doorRelationModel.Outputs.Contains(door.Uuid)
+									)
+									{
+										doorRelationModel.Outputs.Add(door.Uuid);
+										door.Outputs.Add(doorRelationModel.Uuid);
+									}
+								}
+
+						// link stairs from previous level to doors
+						previousLevel?.ModelsWithCoordinates.ForEach(modelWithCoordinates =>
+						{
+							if (modelWithCoordinates.Sign == "Staircase")
+								for (var i = 0; i < modelWithCoordinates.Coordinates.Count - 1; i++)
+								{
+									var lineSegment = new LineSegment(
+										modelWithCoordinates.Coordinates[i],
+										modelWithCoordinates.Coordinates[i + 1]
+									);
+									if (
+										NearlyEqual(doorPoint.Z, lineSegment.P1.Z, 0.1f) &&
+										NearlyEqual(doorPoint.Z, lineSegment.P2.Z, 0.1f) &&
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(modelWithCoordinates.Uuid) &&
+										!modelWithCoordinates.Outputs.Contains(door.Uuid)
+									)
+									{
+										modelWithCoordinates.Outputs.Add(door.Uuid);
+										door.Outputs.Add(modelWithCoordinates.Uuid);
+									}
+								}
+						});
+					}
+
+			previousLevel = level;
+		}
 
 		// find output doors
 		foreach (var level in sortedLevelsByElevation)
@@ -157,7 +213,7 @@ public class RengaToJsonPlugin : IPlugin
 			if (model.Sign == "DoorWayInt")
 				if (model.Outputs.Count < 1 || model.Outputs.Count > 2)
 					throw new NotFoundRelationshipException(
-						$"\n{model.Name}\n{model.Uuid}\nhas {model.Outputs.Count} outputs",
+						$"\n{model.Name}\n{model.Uuid}\nhave {model.Outputs.Count} outputs",
 						model
 					);
 				else if (model.Outputs.Count == 1) model.Sign = "DoorWayOut";
@@ -275,7 +331,7 @@ public class RengaToJsonPlugin : IPlugin
 					}
 					else if (objectType == ObjectTypes.Stair)
 					{
-						if (grid.GridType == (int)Stairway.Bottom)
+						if (grid.GridType == (int)Stairway.Top)
 						{
 							var vertexes = new List<FloatPoint3D>();
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
