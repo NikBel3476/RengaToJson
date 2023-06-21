@@ -78,7 +78,15 @@ public class RengaToJsonPlugin : IPlugin
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
 
-		// collect all building levels
+		// sort stairway points by Z coordinate
+		modelsWithCoordinates.ForEach(modelWithCoordinates =>
+		{
+			if (modelWithCoordinates.Sign == "Staircase")
+				modelWithCoordinates.Coordinates =
+					modelWithCoordinates.Coordinates.OrderBy(coordinates => coordinates.Z).ToList();
+		});
+
+		// collect all building's levels
 		var levelElevations = new List<LevelElevation>();
 		for (var i = 0; i < modelObjectCollection.Count; i++)
 		{
@@ -133,7 +141,7 @@ public class RengaToJsonPlugin : IPlugin
 
 		sortedLevelsByElevation.Remove(highestLevel);
 
-		// add relationships
+		// add relationships between rooms and doors
 		LevelElevation? previousLevel = null;
 		foreach (var level in sortedLevelsByElevation)
 		{
@@ -206,6 +214,31 @@ public class RengaToJsonPlugin : IPlugin
 
 			previousLevel = level;
 		}
+
+		// add relationships between stairs and doors
+		// foreach (var level in sortedLevelsByElevation)
+		// foreach (var stair in level.ModelsWithCoordinates)
+		// 	if (stair.Sign == "Staircase")
+		// 	{
+		// 		var maxByZPoint = stair.Coordinates.Aggregate((maxZCoordinate, coordinate) =>
+		// 			maxZCoordinate.Z < coordinate.Z ? coordinate : maxZCoordinate);
+		// 		// var minByZPoint = stair.Coordinates.Aggregate((minByZCoordinate, coordinate) =>
+		// 		// 	minByZCoordinate.Z > coordinate.Z ? coordinate : minByZCoordinate);
+		//
+		// 		// var pointsWithMinZ = stair.Coordinates.Where(coordinate => coordinate.Z == minByZPoint.Z).ToList();
+		// 		var pointsWithMaxZ = stair.Coordinates.Where(coordinate => coordinate.Z == maxByZPoint.Z).ToList();
+		// 		pointsWithMaxZ.Add(pointsWithMaxZ[0]);
+		//
+		// 		for (var i = 0; i < pointsWithMaxZ.Count - 1; i++)
+		// 		{
+		// 			var lineSegment = new LineSegment(
+		// 				pointsWithMaxZ[i],
+		// 				pointsWithMaxZ[i + 1]
+		// 			);
+		// 			
+		// 			
+		// 		}
+		// 	}
 
 		// find output doors
 		foreach (var level in sortedLevelsByElevation)
@@ -341,7 +374,12 @@ public class RengaToJsonPlugin : IPlugin
 								modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId));
 
 							if (existingStairway != null)
-								existingStairway.Coordinates.AddRange(vertexes);
+								vertexes.ForEach(vertex =>
+								{
+									if (!existingStairway.Coordinates.Contains(vertex))
+										existingStairway.Coordinates.Add(vertex);
+								});
+							// existingStairway.Coordinates.AddRange(vertexes);	
 							else
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
@@ -366,11 +404,18 @@ public class RengaToJsonPlugin : IPlugin
 		var a = lineSegment.P1;
 		var b = point;
 		var c = lineSegment.P2;
-		// return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f);
 
-		return IsPointOnTheLine(point, lineSegment) &&
-		       Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
-		       Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+		// bypass float point number precision
+		var delta = 0.1;
+
+		return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f) &&
+		       Math.Min(a.X, c.X) - delta <= b.X && b.X <= Math.Max(a.X, c.X) + delta &&
+		       Math.Min(a.Y, c.Y) - delta <= b.Y && b.Y <= Math.Max(a.Y, c.Y) + delta;
+
+		// TODO: check that formula
+		// return IsPointOnTheLine(point, lineSegment) &&
+		//        Math.Min(a.X, c.X) - delta <= b.X && b.X <= Math.Max(a.X, c.X) + delta &&
+		//        Math.Min(a.Y, c.Y) - delta <= b.Y && b.Y <= Math.Max(a.Y, c.Y) + delta;
 
 		// var dxc = b.X - a.X;
 		// var dyc = b.Y - a.Y;
@@ -395,7 +440,7 @@ public class RengaToJsonPlugin : IPlugin
 		var c = lineSegment.P2;
 		var result = a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y);
 
-		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.01f);
+		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.1f);
 	}
 
 	private bool NearlyEqual(float a, float b, float epsilon)
