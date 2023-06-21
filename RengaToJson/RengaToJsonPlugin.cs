@@ -78,6 +78,15 @@ public class RengaToJsonPlugin : IPlugin
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
 
+		// sort stairway points by Z coordinate
+		modelsWithCoordinates.ForEach(modelWithCoordinates =>
+		{
+			if (modelWithCoordinates.Sign == "Staircase")
+				modelWithCoordinates.Coordinates =
+					modelWithCoordinates.Coordinates.OrderBy(coordinates => coordinates.Z).ToList();
+		});
+
+		// collect all building's levels
 		var levelElevations = new List<LevelElevation>();
 		for (var i = 0; i < modelObjectCollection.Count; i++)
 		{
@@ -106,6 +115,7 @@ public class RengaToJsonPlugin : IPlugin
 		);
 		sortedLevelsByElevation.Add(highestLevel);
 
+		// split models by levels
 		for (var i = 0; i < sortedLevelsByElevation.Count - 1; i++)
 		{
 			var downsideLevel = sortedLevelsByElevation[i];
@@ -118,8 +128,12 @@ public class RengaToJsonPlugin : IPlugin
 				)
 				{
 					if (model.Sign == "DoorWayInt")
-						model.Coordinates.ForEach(coordinates =>
-							coordinates.Z = Convert.ToSingle(downsideLevel.Elevation));
+						model.Coordinates = model.Coordinates.Select(coordinates =>
+							{
+								coordinates.Z = Convert.ToSingle(downsideLevel.Elevation);
+								return coordinates;
+							})
+							.ToList();
 
 					downsideLevel.ModelsWithCoordinates.Add(model);
 				}
@@ -127,29 +141,79 @@ public class RengaToJsonPlugin : IPlugin
 
 		sortedLevelsByElevation.Remove(highestLevel);
 
-		// add relationships
+		// add relationships between rooms and doors
+		LevelElevation? previousLevel = null;
 		foreach (var level in sortedLevelsByElevation)
-		foreach (var doorRelationModel in level.ModelsWithCoordinates)
-			if (doorRelationModel.Sign == "Room" || doorRelationModel.Sign == "Staircase")
-				for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
-				{
-					var lineSegment = new LineSegment(
-						doorRelationModel.Coordinates[i],
-						doorRelationModel.Coordinates[i + 1]
-					);
-					foreach (var door in level.ModelsWithCoordinates)
-						if (door.Sign == "DoorWayInt")
-							foreach (var doorPoint in door.Coordinates)
-								if (
-									IsPointOnTheLineSegment(doorPoint, lineSegment) &&
-									!door.Outputs.Contains(doorRelationModel.Uuid) &&
-									!doorRelationModel.Outputs.Contains(door.Uuid)
-								)
+		{
+			foreach (var door in level.ModelsWithCoordinates)
+				if (door.Sign == "DoorWayInt")
+					foreach (var doorPoint in door.Coordinates)
+					{
+						foreach (var doorRelationModel in level.ModelsWithCoordinates)
+							if (doorRelationModel.Sign == "Room")
+								for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
 								{
-									doorRelationModel.Outputs.Add(door.Uuid);
-									door.Outputs.Add(doorRelationModel.Uuid);
+									var lineSegment = new LineSegment(
+										doorRelationModel.Coordinates[i],
+										doorRelationModel.Coordinates[i + 1]
+									);
+									if (
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(doorRelationModel.Uuid) &&
+										!doorRelationModel.Outputs.Contains(door.Uuid)
+									)
+									{
+										doorRelationModel.Outputs.Add(door.Uuid);
+										door.Outputs.Add(doorRelationModel.Uuid);
+									}
 								}
-				}
+							else if (doorRelationModel.Sign == "Staircase")
+								for (var i = 0; i < doorRelationModel.Coordinates.Count - 1; i++)
+								{
+									var lineSegment = new LineSegment(
+										doorRelationModel.Coordinates[i],
+										doorRelationModel.Coordinates[i + 1]
+									);
+									if (
+										NearlyEqual(doorPoint.Z, lineSegment.P1.Z, 0.1f) &&
+										NearlyEqual(doorPoint.Z, lineSegment.P2.Z, 0.1f) &&
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(doorRelationModel.Uuid) &&
+										!doorRelationModel.Outputs.Contains(door.Uuid)
+									)
+									{
+										doorRelationModel.Outputs.Add(door.Uuid);
+										door.Outputs.Add(doorRelationModel.Uuid);
+									}
+								}
+
+						// link stairs from previous level to doors
+						previousLevel?.ModelsWithCoordinates.ForEach(modelWithCoordinates =>
+						{
+							if (modelWithCoordinates.Sign == "Staircase")
+								for (var i = 0; i < modelWithCoordinates.Coordinates.Count - 1; i++)
+								{
+									var lineSegment = new LineSegment(
+										modelWithCoordinates.Coordinates[i],
+										modelWithCoordinates.Coordinates[i + 1]
+									);
+									if (
+										NearlyEqual(doorPoint.Z, lineSegment.P1.Z, 0.1f) &&
+										NearlyEqual(doorPoint.Z, lineSegment.P2.Z, 0.1f) &&
+										IsPointOnTheLineSegment(doorPoint, lineSegment) &&
+										!door.Outputs.Contains(modelWithCoordinates.Uuid) &&
+										!modelWithCoordinates.Outputs.Contains(door.Uuid)
+									)
+									{
+										modelWithCoordinates.Outputs.Add(door.Uuid);
+										door.Outputs.Add(modelWithCoordinates.Uuid);
+									}
+								}
+						});
+					}
+
+			previousLevel = level;
+		}
 
 		// find output doors
 		foreach (var level in sortedLevelsByElevation)
@@ -157,7 +221,7 @@ public class RengaToJsonPlugin : IPlugin
 			if (model.Sign == "DoorWayInt")
 				if (model.Outputs.Count < 1 || model.Outputs.Count > 2)
 					throw new NotFoundRelationshipException(
-						$"\n{model.Name}\n{model.Uuid}\nhas {model.Outputs.Count} outputs",
+						$"\n{model.Name}\n{model.Uuid}\nhave {model.Outputs.Count} outputs",
 						model
 					);
 				else if (model.Outputs.Count == 1) model.Sign = "DoorWayOut";
@@ -174,7 +238,7 @@ public class RengaToJsonPlugin : IPlugin
 					points.Add(
 						new Point(
 							modelCoordinates.X / 1000,
-							-modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
+							modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
 							modelCoordinates.Z / 1000
 						)
 					);
@@ -259,7 +323,7 @@ public class RengaToJsonPlugin : IPlugin
 
 							vertexes.Add(vertexes.First());
 							if (
-								vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01f))
+								vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01))
 								&& modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId)) == null
 							)
 								modelsWithCoordinates.Add(
@@ -275,7 +339,7 @@ public class RengaToJsonPlugin : IPlugin
 					}
 					else if (objectType == ObjectTypes.Stair)
 					{
-						if (grid.GridType == (int)Stairway.Bottom)
+						if (grid.GridType == (int)Stairway.Top)
 						{
 							var vertexes = new List<FloatPoint3D>();
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
@@ -285,7 +349,11 @@ public class RengaToJsonPlugin : IPlugin
 								modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId));
 
 							if (existingStairway != null)
-								existingStairway.Coordinates.AddRange(vertexes);
+								vertexes.ForEach(vertex =>
+								{
+									if (!existingStairway.Coordinates.Contains(vertex))
+										existingStairway.Coordinates.Add(vertex);
+								});
 							else
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
@@ -310,11 +378,18 @@ public class RengaToJsonPlugin : IPlugin
 		var a = lineSegment.P1;
 		var b = point;
 		var c = lineSegment.P2;
-		// return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f);
 
-		return IsPointOnTheLine(point, lineSegment) &&
-		       Math.Min(a.X, c.X) <= b.X && b.X <= Math.Max(a.X, c.X) &&
-		       Math.Min(a.Y, c.Y) <= b.Y && b.Y <= Math.Max(a.Y, c.Y);
+		// bypass float point number precision
+		var delta = 0.1;
+
+		return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01) &&
+		       Math.Min(a.X, c.X) - delta <= b.X && b.X <= Math.Max(a.X, c.X) + delta &&
+		       Math.Min(a.Y, c.Y) - delta <= b.Y && b.Y <= Math.Max(a.Y, c.Y) + delta;
+
+		// TODO: check that formula
+		// return IsPointOnTheLine(point, lineSegment) &&
+		//        Math.Min(a.X, c.X) - delta <= b.X && b.X <= Math.Max(a.X, c.X) + delta &&
+		//        Math.Min(a.Y, c.Y) - delta <= b.Y && b.Y <= Math.Max(a.Y, c.Y) + delta;
 
 		// var dxc = b.X - a.X;
 		// var dyc = b.Y - a.Y;
@@ -339,23 +414,25 @@ public class RengaToJsonPlugin : IPlugin
 		var c = lineSegment.P2;
 		var result = a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y);
 
-		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.01f);
+		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.1);
 	}
 
-	private bool NearlyEqual(float a, float b, float epsilon)
+	private bool NearlyEqual(double a, double b, double epsilon)
 	{
-		var absA = Math.Abs(a);
-		var absB = Math.Abs(b);
-		var diff = Math.Abs(a - b);
+		return b - epsilon <= a && a <= b + epsilon;
 
-		if (a == b) // shortcut, handles infinities
-			return true;
-		if (a == 0 || b == 0 || absA + absB < float.MinValue)
-			// a or b is zero or both are extremely close to it
-			// relative error is less meaningful here
-			return diff < epsilon * float.MinValue;
-		// use relative error
-		return diff / (absA + absB) < epsilon;
+		// var absA = Math.Abs(a);
+		// var absB = Math.Abs(b);
+		// var diff = Math.Abs(a - b);
+		//
+		// if (a == b) // shortcut, handles infinities
+		// 	return true;
+		// if (a == 0 || b == 0 || absA + absB < float.MinValue)
+		// 	// a or b is zero or both are extremely close to it
+		// 	// relative error is less meaningful here
+		// 	return diff < epsilon * float.MinValue;
+		// // use relative error
+		// return diff / (absA + absB) < epsilon;
 	}
 
 	// TODO: move to external class
