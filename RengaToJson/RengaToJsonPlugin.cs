@@ -215,31 +215,6 @@ public class RengaToJsonPlugin : IPlugin
 			previousLevel = level;
 		}
 
-		// add relationships between stairs and doors
-		// foreach (var level in sortedLevelsByElevation)
-		// foreach (var stair in level.ModelsWithCoordinates)
-		// 	if (stair.Sign == "Staircase")
-		// 	{
-		// 		var maxByZPoint = stair.Coordinates.Aggregate((maxZCoordinate, coordinate) =>
-		// 			maxZCoordinate.Z < coordinate.Z ? coordinate : maxZCoordinate);
-		// 		// var minByZPoint = stair.Coordinates.Aggregate((minByZCoordinate, coordinate) =>
-		// 		// 	minByZCoordinate.Z > coordinate.Z ? coordinate : minByZCoordinate);
-		//
-		// 		// var pointsWithMinZ = stair.Coordinates.Where(coordinate => coordinate.Z == minByZPoint.Z).ToList();
-		// 		var pointsWithMaxZ = stair.Coordinates.Where(coordinate => coordinate.Z == maxByZPoint.Z).ToList();
-		// 		pointsWithMaxZ.Add(pointsWithMaxZ[0]);
-		//
-		// 		for (var i = 0; i < pointsWithMaxZ.Count - 1; i++)
-		// 		{
-		// 			var lineSegment = new LineSegment(
-		// 				pointsWithMaxZ[i],
-		// 				pointsWithMaxZ[i + 1]
-		// 			);
-		// 			
-		// 			
-		// 		}
-		// 	}
-
 		// find output doors
 		foreach (var level in sortedLevelsByElevation)
 		foreach (var model in level.ModelsWithCoordinates)
@@ -348,7 +323,7 @@ public class RengaToJsonPlugin : IPlugin
 
 							vertexes.Add(vertexes.First());
 							if (
-								vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01f))
+								vertexes.All(x => NearlyEqual(x.Z, vertexes.First().Z, 0.01))
 								&& modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId)) == null
 							)
 								modelsWithCoordinates.Add(
@@ -379,7 +354,6 @@ public class RengaToJsonPlugin : IPlugin
 									if (!existingStairway.Coordinates.Contains(vertex))
 										existingStairway.Coordinates.Add(vertex);
 								});
-							// existingStairway.Coordinates.AddRange(vertexes);	
 							else
 								modelsWithCoordinates.Add(
 									new ModelWithCoordinates(
@@ -408,7 +382,7 @@ public class RengaToJsonPlugin : IPlugin
 		// bypass float point number precision
 		var delta = 0.1;
 
-		return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01f) &&
+		return NearlyEqual(Distance(a, b) + Distance(b, c), Distance(a, c), 0.01) &&
 		       Math.Min(a.X, c.X) - delta <= b.X && b.X <= Math.Max(a.X, c.X) + delta &&
 		       Math.Min(a.Y, c.Y) - delta <= b.Y && b.Y <= Math.Max(a.Y, c.Y) + delta;
 
@@ -440,23 +414,25 @@ public class RengaToJsonPlugin : IPlugin
 		var c = lineSegment.P2;
 		var result = a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y);
 
-		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.1f);
+		return NearlyEqual((a.X - c.X) * (a.Y - c.Y), (c.X - b.X) * (c.Y - b.Y), 0.1);
 	}
 
-	private bool NearlyEqual(float a, float b, float epsilon)
+	private bool NearlyEqual(double a, double b, double epsilon)
 	{
-		var absA = Math.Abs(a);
-		var absB = Math.Abs(b);
-		var diff = Math.Abs(a - b);
+		return b - epsilon <= a && a <= b + epsilon;
 
-		if (a == b) // shortcut, handles infinities
-			return true;
-		if (a == 0 || b == 0 || absA + absB < float.MinValue)
-			// a or b is zero or both are extremely close to it
-			// relative error is less meaningful here
-			return diff < epsilon * float.MinValue;
-		// use relative error
-		return diff / (absA + absB) < epsilon;
+		// var absA = Math.Abs(a);
+		// var absB = Math.Abs(b);
+		// var diff = Math.Abs(a - b);
+		//
+		// if (a == b) // shortcut, handles infinities
+		// 	return true;
+		// if (a == 0 || b == 0 || absA + absB < float.MinValue)
+		// 	// a or b is zero or both are extremely close to it
+		// 	// relative error is less meaningful here
+		// 	return diff < epsilon * float.MinValue;
+		// // use relative error
+		// return diff / (absA + absB) < epsilon;
 	}
 
 	// TODO: move to external class
