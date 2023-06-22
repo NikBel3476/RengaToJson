@@ -78,6 +78,32 @@ public class RengaToJsonPlugin : IPlugin
 
 		var modelsWithCoordinates = GetModelsWithCoordinates(objects3D, modelObjectCollection);
 
+		// TODO: investiagate how correct get coordinates with different doors 
+		// filter coordinates of doors
+		// modelsWithCoordinates.ForEach(modelWithCoordinates =>
+		// {
+		// 	if (modelWithCoordinates.Sign == "DoorWayInt")
+		// 	{
+		// 		var maxByZCoordinate = modelWithCoordinates.Coordinates.Aggregate(modelWithCoordinates.Coordinates[0],
+		// 			(acc, coordinate) =>
+		// 				acc.Z < coordinate.Z ? coordinate : acc
+		// 		);
+		//
+		// 		modelWithCoordinates.Coordinates =
+		// 			modelWithCoordinates
+		// 				.Coordinates
+		// 				.Select(coordinate =>
+		// 				{
+		// 					coordinate.Z = maxByZCoordinate.Z;
+		// 					return coordinate;
+		// 				})
+		// 				.Distinct()
+		// 				.ToList();
+		//
+		// 		modelWithCoordinates.Coordinates.Add(modelWithCoordinates.Coordinates[0]);
+		// 	}
+		// });
+
 		// sort stairway points by Z coordinate
 		modelsWithCoordinates.ForEach(modelWithCoordinates =>
 		{
@@ -141,7 +167,7 @@ public class RengaToJsonPlugin : IPlugin
 
 		sortedLevelsByElevation.Remove(highestLevel);
 
-		// add relationships between rooms and doors
+		// add relationships between rooms, stairways and doors
 		LevelElevation? previousLevel = null;
 		foreach (var level in sortedLevelsByElevation)
 		{
@@ -238,7 +264,7 @@ public class RengaToJsonPlugin : IPlugin
 					points.Add(
 						new Point(
 							modelCoordinates.X / 1000,
-							modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
+							-modelCoordinates.Y / 1000, // FIXME: resolve coordinate system issues
 							modelCoordinates.Z / 1000
 						)
 					);
@@ -320,6 +346,21 @@ public class RengaToJsonPlugin : IPlugin
 							var vertexes = new List<FloatPoint3D>();
 							for (var vertexIndex = 0; vertexIndex < grid.VertexCount; vertexIndex++)
 								vertexes.Add(grid.GetVertex(vertexIndex));
+
+							// var existingDoor =
+							// 	modelsWithCoordinates.Find(model => model.Uuid.Equals(modelObject.uniqueId));
+							// if (existingDoor != null)
+							// 	existingDoor.Coordinates.AddRange(vertexes);
+							// else
+							// 	modelsWithCoordinates.Add(
+							// 		new ModelWithCoordinates(
+							// 			modelObject.Id,
+							// 			modelObject.uniqueId,
+							// 			modelObject.Name,
+							// 			vertexes,
+							// 			"DoorWayInt"
+							// 		)
+							// 	);
 
 							vertexes.Add(vertexes.First());
 							if (
